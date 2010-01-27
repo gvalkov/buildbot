@@ -131,3 +131,22 @@ def remove_userpassword(url):
     repo_url = protocol_url[1].split('@')[-1]
 
     return protocol + '://' + repo_url
+
+def flatten(seq, types=(list, set, tuple)):
+    '''
+    >>> l = [[[1,2], 3], 4, [5,6]]
+    >>> flatten(l)
+    [1, 2, 3, 4, 5, 6]
+    '''
+    
+    if isinstance(seq, set): seq=list(seq)
+    
+    res = []
+    for i in range(len(seq)):
+        if isinstance(seq[i], types):
+            res.extend(flatten(seq[i]))
+        else:
+            res.append(seq[i])
+    return res
+
+def islist(seq, types=(list,)): return isinstance(seq, types)

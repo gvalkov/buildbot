@@ -3,6 +3,7 @@
 from twisted.trial import unittest
 
 from buildbot import util
+from buildbot.util import deps
 
 
 class Foo(util.ComparableMixin):
@@ -54,3 +55,43 @@ class test_checkRepoURL(unittest.TestCase):
     def test_win32file_path(self):
         self.assertUrl('c:\\repos\\my-repo', 'c:\\repos\\my-repo')
 
+
+class testDependencies(unittest.TestCase):
+
+    def test_walkDependencyDict(self):
+        dep = {'A' : ['B', 'C'],
+               'B' : ['D'],
+               'C' : [],
+               'D' : [],
+              }
+
+        walked = [['C', 'D'], 'B', 'A']
+        walked_flat = ['C', 'D', 'B', 'A']
+
+        res = deps.walkDependencyDict(dep)
+        self.assertEqual(res, walked)
+
+        res = deps.walkDependencyDict(dep, group_parallel=False)
+        self.assertEqual(res, walked_flat)
+
+    def test_getDependencies(self):
+
+        dep = {'A' : ['B', 'D'],
+               'B' : ['C', 'E'],
+               'C' : ['D', 'E'],
+               'D' : [],
+               'E' : [],
+               'F' : [],
+               'G' : [],
+              }
+
+        res = deps.getDependencies('A', dep)
+        walked = ['D', 'E', 'C', 'B', 'A']
+
+        self.assertEqual(res, walked)
+        self.assertEqual(deps.getDependencies('E', dep),
+                         ['E'])
+
+        dep['D'] = ['A']
+        self.assertRaises(Exception,
+                          deps.getDependencies, 'A', dep)
