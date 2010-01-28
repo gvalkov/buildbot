@@ -121,12 +121,17 @@ class Scheduler(BaseUpstreamScheduler):
 
         BaseUpstreamScheduler.__init__(self, name, properties)
         self.treeStableTimer = treeStableTimer
-        errmsg = ("The builderNames= argument to Scheduler must be a list "
+        
+        errmsg = ("The builderNames= argument to Scheduler must be a list or a dictionary "
                   "of Builder description names (i.e. the 'name' key of the "
                   "Builder specification dictionary)")
-        assert isinstance(builderNames, (list, tuple)), errmsg
+
+        assert isinstance(builderNames, (list, tuple, dict)), errmsg
         for b in builderNames:
+            if hasattr(b, '__iter__'):
+                for i in b: assert isinstance(i, str), errmsg 
             assert isinstance(b, str), errmsg
+
         self.builderNames = builderNames
         self.branch = branch
         if fileIsImportant:
@@ -140,6 +145,8 @@ class Scheduler(BaseUpstreamScheduler):
         self.categories = categories
 
     def listBuilderNames(self):
+        if isinstance(self.builderNames, dict):
+            return self.builderNames.keys()
         return self.builderNames
 
     def getPendingBuildTimes(self):

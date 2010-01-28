@@ -991,16 +991,30 @@ class BuildMaster(service.MultiService):
             s.addChange(change)
 
     def submitBuildSet(self, bs):
-        # determine the set of Builders to use
-        builders = []
-        for name in bs.builderNames:
-            b = self.botmaster.builders.get(name)
-            if b:
-                if b not in builders:
-                    builders.append(b)
-                continue
-            # TODO: add aliases like 'all'
-            raise KeyError("no such builder named '%s'" % name)
+        ''' Determine the set of Builders to use '''
+
+        allbuilders = self.botmaster.builders
+
+        # If we are working with a dependency mapping
+        if isinstance(bs.builderNames, dict):
+            builders = {}
+            try:
+                for node, deps in bs.builderNames.iteritems():
+                    resolved_deps = [allbuilders[b] for b in deps]
+                    builders[allbuilders[node]] = resolved_deps
+            except KeyError, e:
+                raise KeyError("no such builder named '%s'" % e.args)
+
+        else:
+            builders = []
+            for name in bs.builderNames:
+                b = self.botmaster.builders.get(name)
+                if b:
+                    if b not in builders:
+                        builders.append(b)
+                    continue
+                # TODO: add aliases like 'all'
+                raise KeyError("no such builder named '%s'" % name)
 
         # now tell the BuildSet to create BuildRequests for all those
         # Builders and submit them

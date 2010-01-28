@@ -122,10 +122,7 @@ class Set(unittest.TestCase):
         self.failUnlessEqual(res, [])
 
         # the first build finishes here, with FAILURE
-        builderstatus_a = builder.BuilderStatus("a")
-        bsa = builder.BuildStatus(builderstatus_a, 1)
-        bsa.setResults(builder.FAILURE)
-        a.requests[0].finished(bsa)
+        a.requests[0].finished(self._getBuildStatus(a, builder.FAILURE))
 
         # any FAILURE flunks the BuildSet immediately, so the
         # waitUntilSuccess deferred fires right away. However, the
@@ -138,10 +135,7 @@ class Set(unittest.TestCase):
         self.failUnlessEqual(bss.getResults(), builder.FAILURE)
 
         # here we finish the second build
-        builderstatus_b = builder.BuilderStatus("b")
-        bsb = builder.BuildStatus(builderstatus_b, 1)
-        bsb.setResults(builder.SUCCESS)
-        b.requests[0].finished(bsb)
+        b.requests[0].finished(self._getBuildStatus(a, builder.SUCCESS))
 
         # .. which ought to fire the waitUntilFinished deferred
         self.failUnlessEqual(len(res), 2)
@@ -167,16 +161,94 @@ class Set(unittest.TestCase):
         self.failUnlessEqual(st.getBuilderNames(), ["a","b"])
         self.failIf(st.isFinished())
 
-        builderstatus_a = builder.BuilderStatus("a")
-        bsa = builder.BuildStatus(builderstatus_a, 1)
-        bsa.setResults(builder.SUCCESS)
-        a.requests[0].finished(bsa)
-
-        builderstatus_b = builder.BuilderStatus("b")
-        bsb = builder.BuildStatus(builderstatus_b, 1)
-        bsb.setResults(builder.SUCCESS)
-        b.requests[0].finished(bsb)
+        a.requests[0].finished(self._getBuildStatus(a, builder.SUCCESS))
+        b.requests[0].finished(self._getBuildStatus(b, builder.SUCCESS))
 
         self.failUnless(st.isFinished())
         self.failUnlessEqual(st.getResults(), builder.SUCCESS)
-        
+
+    def testDependenciesParallelSuccess(self):
+        S = buildset.BuildSet
+
+        A, B, C, D, E = [i() for i in [FakeBuilder]*5]
+        _names = [(A,'<Builder A>'), (B,'<Builder B>'),
+                  (C,'<Builder C>'), (D,'<Builder D>'),
+                  (E,'<Builder E>')]
+
+        [setattr(i, 'name', j) for i,j in _names]
+
+        dependencies = { A : [B, C], B : [], C : [D], D : [], E : [B]}
+
+        # This mapping should be unfolded as:
+        # [['<Builder B>', '<Builder D>'], ['<Builder E>', '<Builder C>'], '<Builder A>']
+
+        bnames = [str(i) for i in dependencies.keys()]
+        source = sourcestamp.SourceStamp()
+
+        def printRequests():
+            print '\nRequests:'
+            for i, j in _names: print j, ':', i.requests
+
+        s = S(bnames, source, 'forced build')
+        s.start(dependencies)
+
+        st = s.status
+        self.failUnlessEqual(st.getSourceStamp(), source)
+        self.failUnlessEqual(st.getReason(), "forced build")
+        self.failUnlessEqual(st.getBuilderNames(), bnames)
+        self.failIf(st.isFinished())
+
+        B.requests[0].finished(self._getBuildStatus(B, builder.SUCCESS))
+        D.requests[0].finished(self._getBuildStatus(D, builder.SUCCESS))
+        C.requests[0].finished(self._getBuildStatus(C, builder.SUCCESS))
+        E.requests[0].finished(self._getBuildStatus(E, builder.SUCCESS))
+        A.requests[0].finished(self._getBuildStatus(A, builder.SUCCESS))
+
+        self.failUnless(st.isFinished())
+        self.failUnlessEqual(st.getResults(), builder.SUCCESS)
+
+    def testDependenciesParallelFailure(self):
+        S = buildset.BuildSet
+
+        A, B, C, D, E = [i() for i in [FakeBuilder]*5]
+        _names = [(A,'<Builder A>'), (B,'<Builder B>'),
+                  (C,'<Builder C>'), (D,'<Builder D>'),
+                  (E,'<Builder E>')]
+        [setattr(i, 'name', j) for i,j in _names]
+
+        dependencies = { A : [B, C], B : [], C : [D], D : [], E : [B]}
+
+        # This mapping should be unfolded as:
+        # ['<Builder B>', '<Builder D>', '<Builder C>', '<Builder A>']
+
+        bnames = [str(i) for i in dependencies.keys()]
+        source = sourcestamp.SourceStamp()
+
+        def printRequests():
+            print '\nRequests:'
+            for i, j in _names: print j, ':', i.requests
+
+        s = S(bnames, source, 'forced build')
+        s.start(dependencies)
+
+        st = s.status
+        self.failUnlessEqual(st.getSourceStamp(), source)
+        self.failUnlessEqual(st.getReason(), "forced build")
+        self.failUnlessEqual(st.getBuilderNames(), bnames)
+        self.failIf(st.isFinished())
+
+        B.requests[0].finished(self._getBuildStatus(B, builder.SUCCESS))
+        D.requests[0].finished(self._getBuildStatus(D, builder.FAILURE))
+        C.requests[0].finished(self._getBuildStatus(C, builder.SUCCESS))
+        E.requests[0].finished(self._getBuildStatus(E, builder.SUCCESS))
+        A.requests[0].finished(self._getBuildStatus(A, builder.SUCCESS))
+
+        self.failUnless(st.isFinished())
+        self.failUnlessEqual(st.getResults(), builder.FAILURE)
+    
+    def _getBuildStatus(self, builder_i, status):
+        builderstatus = builder.BuilderStatus(builder_i.name)
+        buildstatus = builder.BuildStatus(builderstatus, 1)
+        buildstatus.setResults(status)
+
+        return buildstatus
