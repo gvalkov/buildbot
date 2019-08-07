@@ -123,18 +123,15 @@ class RemoteUserAuth(TestReactorMixin, www.WwwTestMixin, unittest.TestCase):
                          'realm': 'foo.com',
                          'email': 'rachel'})
 
-    @defer.inlineCallbacks
-    def test_maybeAutoLogin_no_header(self):
-        try:
-            yield self.auth.maybeAutoLogin(self.request)
-        except Error as e:
-            self.assertEqual(int(e.status), 403)
-        else:
-            self.fail("403 expected")
+        self.request.input_headers[b'HDR'] = b'rachel'
+        yield self.auth.maybeAutoLogin(self.request)
+        self.assertEqual(self.request.session.user_info, {
+                         'username': 'rachel',
+                         'realm': None,
+                         'email': 'rachel'})
 
     @defer.inlineCallbacks
-    def test_maybeAutoLogin_mismatched_value(self):
-        self.request.input_headers[b'HDR'] = b'rachel'
+    def test_maybeAutoLogin_no_header(self):
         try:
             yield self.auth.maybeAutoLogin(self.request)
         except Error as e:

@@ -1,0 +1,1 @@
+:py:class:`~buildbot.www.auth.RemoteUser`: Make realm optional in the REMOTE_USER header.

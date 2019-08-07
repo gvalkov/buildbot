@@ -102,7 +102,7 @@ class NoAuth(AuthBase):
 
 class RemoteUserAuth(AuthBase):
     header = b"REMOTE_USER"
-    headerRegex = re.compile(br"(?P<username>[^ @]+)@(?P<realm>[^ @]+)")
+    headerRegex = re.compile(br"(?P<username>[^ @]+)(@(?P<realm>[^ @]+))?")
 
     def __init__(self, header=None, headerRegex=None, **kwargs):
         super().__init__(**kwargs)
